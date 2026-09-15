@@ -1,0 +1,572 @@
+openapi: 3.0.3
+info:
+  title: VisualGestion API
+  version: 1.0.0
+  description: API REST para consultar propiedades inmobiliarias y enviar consultas por broker.
+servers:
+  - url: /
+    description: Servidor actual
+tags:
+  - name: Autenticación
+  - name: Brokers
+  - name: Bienes raíces
+  - name: Consultas
+paths:
+  /login:
+    post:
+      tags: [Autenticación]
+      summary: Obtener un Bearer token
+      description: Valida IdBroker y PwdWS contra mae_brokers. Solo admite brokers habilitados.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id_broker, password]
+              properties:
+                id_broker:
+                  type: string
+                  maxLength: 6
+                  example: A004
+                password:
+                  type: string
+                  example: SU_PWDWS
+      responses:
+        '200':
+          description: Token emitido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          description: Demasiados intentos
+  /bienesraices:
+    get:
+      tags: [Bienes raíces]
+      summary: Listar y filtrar propiedades
+      description: >
+        Devuelve únicamente propiedades del broker autenticado. Z999 puede consultar todos
+        los brokers. Los filtros por texto aceptan varios nombres separados por coma;
+        por ejemplo tipo=Departamento,Casa. Venta y Alquiler también incluyen propiedades A-V.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Localidad'
+        - $ref: '#/components/parameters/Partido'
+        - $ref: '#/components/parameters/Provincia'
+        - $ref: '#/components/parameters/Pais'
+        - $ref: '#/components/parameters/Antiguedad'
+        - $ref: '#/components/parameters/Comercializacion'
+        - $ref: '#/components/parameters/Vista'
+        - $ref: '#/components/parameters/Orientacion'
+        - $ref: '#/components/parameters/Tipo'
+        - $ref: '#/components/parameters/Cochera'
+        - $ref: '#/components/parameters/Ambientes'
+        - $ref: '#/components/parameters/MonedaVenta'
+        - $ref: '#/components/parameters/MonedaAlquiler'
+        - name: idLocalidad
+          in: query
+          description: IDs de localidad separados por coma (compatibilidad técnica).
+          schema: { type: string }
+        - name: idPartido
+          in: query
+          description: IDs de partido separados por coma.
+          schema: { type: string }
+        - name: idProvincia
+          in: query
+          description: IDs de provincia separados por coma.
+          schema: { type: string }
+        - name: idPais
+          in: query
+          description: IDs de país separados por coma.
+          schema: { type: string }
+        - name: Antiguedad
+          in: query
+          description: IDs de antigüedad separados por coma.
+          schema: { type: string }
+        - name: IdComercializacion
+          in: query
+          description: IDs de comercialización separados por coma.
+          schema: { type: string }
+        - name: IdVista
+          in: query
+          description: IDs de vista separados por coma.
+          schema: { type: string }
+        - name: idOrientacion
+          in: query
+          description: IDs de orientación separados por coma.
+          schema: { type: string }
+        - name: idTipologia
+          in: query
+          description: IDs de tipología separados por coma.
+          schema: { type: string }
+        - name: idcochera
+          in: query
+          description: IDs de cochera separados por coma.
+          schema: { type: string }
+        - name: idTipoMonedaAlq
+          in: query
+          description: IDs de moneda de alquiler separados por coma.
+          schema: { type: string }
+        - name: idTipoMonedaVta
+          in: query
+          description: IDs de moneda de venta separados por coma.
+          schema: { type: string }
+        - name: ImporteVta
+          in: query
+          description: Importe exacto de venta.
+          schema: { type: number, minimum: 0 }
+        - name: ImporteAlq
+          in: query
+          description: Importe exacto de alquiler.
+          schema: { type: number, minimum: 0 }
+        - name: precio_venta_desde
+          in: query
+          schema: { type: number, minimum: 0 }
+        - name: precio_venta_hasta
+          in: query
+          schema: { type: number, minimum: 0 }
+        - name: precio_alquiler_desde
+          in: query
+          schema: { type: number, minimum: 0 }
+        - name: precio_alquiler_hasta
+          in: query
+          schema: { type: number, minimum: 0 }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: per_page
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Página de propiedades y filtros disponibles para el resultado actual
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PropertiesResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /bienesraices/{idBroker}/{idBienes}:
+    get:
+      tags: [Bienes raíces]
+      summary: Obtener la ficha de una propiedad
+      description: >
+        Identifica la propiedad mediante su clave compuesta. Un broker normal solamente puede
+        consultar fichas propias; Z999 puede consultar las de cualquier broker. Una propiedad
+        inexistente o ajena devuelve 404.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: idBroker
+          in: path
+          required: true
+          description: Identificador del broker propietario.
+          schema:
+            type: string
+            maxLength: 6
+            pattern: '^[A-Za-z0-9]+$'
+          example: A004
+        - name: idBienes
+          in: path
+          required: true
+          description: Identificador de la propiedad dentro del broker.
+          schema:
+            type: number
+            minimum: 0
+          example: 585
+      responses:
+        '200':
+          description: Ficha de la propiedad
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Property'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: La propiedad no existe o no pertenece al broker autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /ubicaciones:
+    get:
+      tags: [Bienes raíces]
+      summary: Autocompletar ubicaciones
+      description: >
+        Busca parcialmente en localidad, partido, provincia y país. Solo devuelve ubicaciones
+        con propiedades del broker autenticado; Z999 puede ver todas. Sin q ni limit devuelve
+        todas las ubicaciones disponibles. Si se informa q sin limit, devuelve hasta 10.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          description: Texto parcial de búsqueda. Puede contener varias palabras.
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 100
+          example: Ramos
+        - name: limit
+          in: query
+          description: Máximo de sugerencias. Con q el valor predeterminado es 10.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+          example: 10
+      responses:
+        '200':
+          description: Sugerencias de ubicaciones
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LocationSuggestion'
+                  meta:
+                    type: object
+                    properties:
+                      busqueda: { type: string, nullable: true }
+                      cantidad: { type: integer }
+                      limite: { type: integer, nullable: true }
+                      hay_mas: { type: boolean }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /brokers/{idBroker}:
+    get:
+      tags: [Brokers]
+      summary: Obtener el perfil público de una inmobiliaria
+      description: >
+        Devuelve únicamente datos públicos de un broker habilitado. Un broker normal solo
+        puede obtener su propio perfil; Z999 puede consultar cualquier broker habilitado.
+        Los perfiles inexistentes, deshabilitados o ajenos devuelven 404.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: idBroker
+          in: path
+          required: true
+          description: Identificador del broker.
+          schema:
+            type: string
+            maxLength: 6
+            pattern: '^[A-Za-z0-9]+$'
+          example: A004
+      responses:
+        '200':
+          description: Perfil público del broker
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Broker'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: El broker no existe, está deshabilitado o no es accesible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /consultas:
+    post:
+      tags: [Consultas]
+      summary: Enviar una consulta por una propiedad
+      description: >
+        Envía la consulta al email configurado en mae_brokers para la inmobiliaria propietaria.
+        El email del interesado se utiliza como Reply-To. Un broker normal solo puede enviar
+        consultas por sus propiedades; Z999 puede hacerlo por cualquier propiedad.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PropertyInquiry'
+            example:
+              id_broker: A004
+              id_bienes: 585
+              nombre: Juan Pérez
+              email: juan@example.com
+              telefono: +54 11 4444-5555
+              mensaje: Quisiera coordinar una visita a la propiedad.
+      responses:
+        '202':
+          description: Consulta enviada correctamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      id_broker: { type: string, example: A004 }
+                      id_bienes: { oneOf: [{ type: integer }, { type: number }] }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: La propiedad no existe o no pertenece al broker autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          description: Se superó el límite de consultas
+        '503':
+          description: El servicio de correo no se encuentra disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: token cifrado
+  parameters:
+    Localidad:
+      name: localidad
+      in: query
+      schema: { type: string }
+      example: Ramos Mejía,Haedo
+    Partido:
+      name: partido
+      in: query
+      schema: { type: string }
+      example: La Matanza
+    Provincia:
+      name: provincia
+      in: query
+      schema: { type: string }
+      example: Buenos Aires
+    Pais:
+      name: pais
+      in: query
+      schema: { type: string }
+      example: Argentina
+    Antiguedad:
+      name: antiguedad
+      in: query
+      schema: { type: string }
+      example: A Estrenar,Menor a 10
+    Comercializacion:
+      name: comercializacion
+      in: query
+      schema: { type: string }
+      example: Venta
+    Vista:
+      name: vista
+      in: query
+      schema: { type: string }
+      example: Al Frente
+    Orientacion:
+      name: orientacion
+      in: query
+      schema: { type: string }
+      example: Norte,Este
+    Tipo:
+      name: tipo
+      in: query
+      schema: { type: string }
+      example: Departamento,Casa
+    Cochera:
+      name: cochera
+      in: query
+      schema: { type: string }
+      example: Cochera Cubierta
+    Ambientes:
+      name: ambientes
+      in: query
+      description: Una o varias cantidades enteras separadas por coma.
+      schema: { type: string }
+      example: 2,3,4
+    MonedaVenta:
+      name: moneda_venta
+      in: query
+      schema: { type: string }
+      example: Dolares
+    MonedaAlquiler:
+      name: moneda_alquiler
+      in: query
+      schema: { type: string }
+      example: Pesos
+  responses:
+    Unauthorized:
+      description: Credenciales o token inválidos
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ValidationError:
+      description: Parámetros inválidos
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message: { type: string }
+              errors: { type: object }
+  schemas:
+    Error:
+      type: object
+      properties:
+        message: { type: string }
+    Broker:
+      type: object
+      properties:
+        id: { type: string, example: A004 }
+        razon_social: { type: string, nullable: true }
+        email: { type: string, nullable: true }
+        telefono: { type: string, nullable: true }
+        telefonos: { type: string, nullable: true }
+        celular: { type: string, nullable: true }
+        direccion: { type: string, nullable: true }
+        localidad: { type: string, nullable: true }
+        partido: { type: string, nullable: true }
+        provincia: { type: string, nullable: true }
+        pais: { type: string, nullable: true }
+        codigo_postal: { type: string, nullable: true }
+        latitud: { type: number, format: double, nullable: true }
+        longitud: { type: number, format: double, nullable: true }
+        web: { type: string, nullable: true }
+        matricula: { type: string, nullable: true }
+    LoginResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            token: { type: string }
+            token_type: { type: string, example: Bearer }
+            expires_in: { type: integer, example: 86400 }
+            expires_at: { type: string, format: date-time }
+            broker: { $ref: '#/components/schemas/Broker' }
+    CatalogValue:
+      type: object
+      properties:
+        id: { oneOf: [{ type: string }, { type: integer }] }
+        nombre: { type: string, nullable: true }
+    Property:
+      type: object
+      description: Los precios son nulos y texto es Consultar cuando NoPPI=1.
+      properties:
+        id: { oneOf: [{ type: integer }, { type: number }] }
+        id_broker: { type: string }
+        direccion: { type: object }
+        descripcion: { type: string, nullable: true }
+        ubicacion: { type: object }
+        caracteristicas: { type: object }
+        comercializacion: { type: object }
+        precios: { type: object }
+        multimedia:
+          type: object
+          properties:
+            imagenes:
+              type: array
+              maxItems: 5
+              items: { type: string, format: uri }
+            video: { type: string, format: uri, nullable: true }
+            tour_360: { type: string, format: uri, nullable: true }
+        broker: { $ref: '#/components/schemas/Broker' }
+    LocationSuggestion:
+      type: object
+      properties:
+        etiqueta:
+          type: string
+          example: Buenos Aires, La Matanza, Ramos Mejía
+        pais: { $ref: '#/components/schemas/CatalogValue' }
+        provincia: { $ref: '#/components/schemas/CatalogValue' }
+        partido: { $ref: '#/components/schemas/CatalogValue' }
+        localidad: { $ref: '#/components/schemas/CatalogValue' }
+        cantidad_propiedades: { type: integer, example: 84 }
+        filtro:
+          type: object
+          properties:
+            parametro: { type: string, example: idLocalidad }
+            valor:
+              oneOf:
+                - type: integer
+                - type: string
+    PropertyInquiry:
+      type: object
+      required: [id_broker, id_bienes, nombre, email, mensaje]
+      properties:
+        id_broker:
+          type: string
+          maxLength: 6
+          pattern: '^[A-Za-z0-9]+$'
+        id_bienes:
+          type: number
+          minimum: 0
+        nombre:
+          type: string
+          minLength: 2
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        telefono:
+          type: string
+          maxLength: 50
+          nullable: true
+        mensaje:
+          type: string
+          minLength: 10
+          maxLength: 2000
+    PropertiesResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Property' }
+        meta: { type: object }
+        links: { type: object }
+        filtros_aplicados:
+          type: object
+          additionalProperties:
+            oneOf:
+              - type: array
+                items:
+                  oneOf:
+                    - type: string
+                    - type: integer
+              - type: number
+          description: >
+            Filtros de búsqueda activos. Los filtros múltiples son arrays y los importes o
+            límites de precio son números. No incluye page ni per_page.
+          example:
+            tipo: [Departamento, Casa]
+            ambientes: [2, 3]
+            precio_venta_desde: 80000
+        filtros_disponibles:
+          type: object
+          description: Valores y cantidades presentes luego de aplicar los filtros actuales.
